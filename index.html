@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Tool AI Tài Xỉu Go88 VIP</title>
+  <title>Tool Phân Tích Giải Trí Tài Xỉu</title>
   <style>
     body {
       margin: 0;
@@ -14,21 +14,22 @@
       padding: 20px;
     }
     h1 {
-      font-size: 32px;
+      font-size: 28px;
       color: #ffcc00;
       text-shadow: 0 0 5px #fff000, 0 0 10px #ffaa00;
     }
     .input-container, .result, .history, .log {
       margin: 20px auto;
-      max-width: 520px;
+      max-width: 720px;
       padding: 20px;
       border: 2px solid #ffaa00;
       border-radius: 10px;
       background: #111;
       box-shadow: 0 0 15px #ffaa00;
+      text-align: left;
     }
-    input[type="text"] {
-      width: 90%;
+    input[type="text"], textarea {
+      width: 96%;
       padding: 10px;
       font-size: 16px;
       background: #222;
@@ -37,9 +38,9 @@
       color: #fff;
     }
     button {
-      padding: 10px 20px;
-      font-size: 18px;
-      margin-top: 10px;
+      padding: 10px 16px;
+      font-size: 16px;
+      margin: 8px 6px 0 0;
       background-color: #ffaa00;
       color: #000;
       border: none;
@@ -48,126 +49,245 @@
       font-weight: bold;
     }
     .result {
-      font-size: 20px;
+      font-size: 18px;
       color: #00ffcc;
     }
     .highlight {
-      font-size: 28px;
+      font-size: 22px;
       color: #00ff00;
       font-weight: bold;
       text-shadow: 0 0 8px #00ffcc;
     }
     .highlight-keo {
-      font-size: 26px;
+      font-size: 20px;
       color: #ff1493;
       font-weight: bold;
       text-shadow: 0 0 8px #ff69b4;
     }
     .history {
-      font-size: 16px;
+      font-size: 14px;
       color: #ccc;
     }
     .log {
-      font-size: 14px;
+      font-size: 13px;
       color: #bbb;
-      max-height: 200px;
+      max-height: 260px;
       overflow-y: auto;
-      text-align: left;
     }
+    .disclaimer {
+      color: #ff8080;
+      font-weight: bold;
+      margin-top: 10px;
+    }
+    table.stats { width: 100%; border-collapse: collapse; margin-top:10px }
+    table.stats td, table.stats th { border: 1px solid #333; padding: 6px; color:#ddd }
   </style>
 </head>
 <body>
-  <h1>🎲 Tool AI Tài Xỉu Go88 VIP (Full Nâng Cấp + Kéo 1-1)</h1>
+  <h1>🎲 Tool Phân Tích Giải Trí Tài Xỉu</h1>
+
   <div class="input-container">
-    <p><strong>Nhập kết quả 15 phiên gần nhất:</strong></p>
-    <p style="font-size:14px;">(Nhập số tổng từng phiên, cách nhau bằng dấu phẩy)</p>
-    <input type="text" id="historyInput" placeholder="VD: 9,7,11,12,5,7,10,11,9,9,17,16,12,15,..." />
-    <br/>
-    <button onclick="analyze()">Phân Tích & Dự Đoán</button>
+    <p><strong>Nhập kết quả 15-50 phiên gần nhất (tổng từng phiên):</strong></p>
+    <p style="font-size:13px;">(Cách nhau bằng dấu phẩy hoặc xuống dòng. Ví dụ: 9,7,11,12,5,7,10)</p>
+    <textarea id="historyInput" rows="3" placeholder="VD: 9,7,11,12,5,7,10,11,9,9,17,16,12,15"></textarea>
+    <div style="margin-top:8px">
+      <button id="analyzeBtn">Phân Tích & Dự Đoán</button>
+      <button id="clearBtn">Xóa lịch sử</button>
+      <button id="exportBtn">Xuất CSV</button>
+      <label style="color:#fff; margin-left:8px"><input type="checkbox" id="speakToggle"> Bật đọc dự đoán</label>
+    </div>
+    <div class="disclaimer">LƯU Ý: Công cụ chỉ phục vụ giải trí và minh họa thống kê. Không đảm bảo thắng, không hỗ trợ hành vi gian lận.</div>
   </div>
 
   <div class="result" id="result"></div>
   <div class="history" id="patternOutput"></div>
-  <div class="log" id="historyLog"><strong>📅 Lịch sử dự đoán hôm nay:</strong><br/></div>
+  <div class="log" id="historyLog"><strong>📅 Lịch sử phân tích:</strong><br/></div>
 
   <script>
-    let logData = [];
+    // BlobSha used for update: 91eca510d80272060dd4d05ced849d5c7a52e531
+    const STORAGE_INPUT_KEY = 'tk_historyInput_v1';
+    const STORAGE_LOG_KEY = 'tk_logData_v1';
+
+    // Load saved input & log
+    document.addEventListener('DOMContentLoaded', () => {
+      const saved = localStorage.getItem(STORAGE_INPUT_KEY);
+      if (saved) document.getElementById('historyInput').value = saved;
+      const savedLog = JSON.parse(localStorage.getItem(STORAGE_LOG_KEY) || '[]');
+      window.logData = savedLog;
+      renderLog();
+    });
+
+    document.getElementById('analyzeBtn').addEventListener('click', analyze);
+    document.getElementById('clearBtn').addEventListener('click', clearHistory);
+    document.getElementById('exportBtn').addEventListener('click', exportCSV);
 
     function speak(text) {
-      const msg = new SpeechSynthesisUtterance(text);
-      msg.lang = 'vi-VN';
-      msg.rate = 1;
-      window.speechSynthesis.speak(msg);
+      if (!document.getElementById('speakToggle').checked) return;
+      try {
+        const msg = new SpeechSynthesisUtterance(text);
+        msg.lang = 'vi-VN';
+        msg.rate = 1;
+        window.speechSynthesis.speak(msg);
+      } catch (e) { /* ignore */ }
+    }
+
+    function parseInput(rawStr) {
+      if (!rawStr) return [];
+      // split by commas or whitespace/newlines
+      const parts = rawStr.split(/[\,\n\s]+/).map(s => s.trim()).filter(s => s !== '');
+      const nums = parts.map(p => {
+        // allow numbers only
+        const n = parseInt(p, 10);
+        return Number.isFinite(n) ? n : NaN;
+      }).filter(n => !Number.isNaN(n));
+      return nums;
+    }
+
+    function labelize(nums) {
+      // label by rule: >=11 => Tài, else Xỉu
+      return nums.map(x => x >= 11 ? 'Tài' : 'Xỉu');
+    }
+
+    function computeTransitionMatrix(labels) {
+      const states = ['Tài','Xỉu'];
+      const counts = { 'Tài': {'Tài':0,'Xỉu':0}, 'Xỉu': {'Tài':0,'Xỉu':0} };
+      for (let i=0;i<labels.length-1;i++) {
+        const a = labels[i], b = labels[i+1];
+        if (counts[a] && typeof counts[a][b] === 'number') counts[a][b]++;
+      }
+      const probs = { 'Tài': {'Tài':0,'Xỉu':0}, 'Xỉu': {'Tài':0,'Xỉu':0} };
+      for (const s of states) {
+        const total = counts[s]['Tài'] + counts[s]['Xỉu'];
+        if (total === 0) continue;
+        probs[s]['Tài'] = Math.round((counts[s]['Tài']/total)*1000)/10;
+        probs[s]['Xỉu'] = Math.round((counts[s]['Xỉu']/total)*1000)/10;
+      }
+      return {counts, probs};
+    }
+
+    function detectPatterns(labels) {
+      let patterns = '';
+      let keo11Count = 0;
+      for (let i = 2; i < labels.length; i++) {
+        const slice = labels.slice(i-2,i+1).join('-');
+        if (slice === 'Tài-Tài-Xỉu') patterns += `🔁 Cầu 2-1 Tài tại phiên ${i+1}<br>`;
+        if (slice === 'Xỉu-Xỉu-Tài') patterns += `🔁 Cầu 2-1 Xỉu tại phiên ${i+1}<br>`;
+        if (slice === 'Tài-Tài-Tài') patterns += `💪 Cầu bền Tài tại phiên ${i+1}<br>`;
+        if (slice === 'Xỉu-Xỉu-Xỉu') patterns += `💪 Cầu bền Xỉu tại phiên ${i+1}<br>`;
+        if (slice === 'Tài-Xỉu-Tài' || slice === 'Xỉu-Tài-Xỉu') {
+          keo11Count++;
+          patterns += `🎯 KÉO 1-1: ${slice} tại phiên ${i+1}<br>`;
+        }
+      }
+      return {patterns, keo11Count};
     }
 
     function analyze() {
-      const input = document.getElementById("historyInput").value.trim();
-      const raw = input.split(",").map(x => parseInt(x));
-      if (raw.length < 10) {
-        alert("Vui lòng nhập ít nhất 10 phiên!");
-        return;
-      }
+      const raw = document.getElementById('historyInput').value.trim();
+      localStorage.setItem(STORAGE_INPUT_KEY, raw);
+      const nums = parseInput(raw);
+      if (nums.length < 10) { alert('Vui lòng nhập ít nhất 10 phiên hợp lệ (số nguyên).'); return; }
+      if (nums.length > 200) { if (!confirm('Bạn đã nhập >200 mục. Tiếp tục?')) return; }
 
-      const labels = raw.map(x => x >= 11 ? "Tài" : "Xỉu");
-      let patterns = "";
-      let keo11Count = 0;
-      let keo11Type = "";
-      
-      for (let i = 2; i < labels.length; i++) {
-        const slice = labels.slice(i - 2, i + 1).join("-");
-        if (slice === "Tài-Tài-Xỉu") patterns += `🔁 Cầu 2-1 Tài tại phiên ${i + 1}<br>`;
-        if (slice === "Xỉu-Xỉu-Tài") patterns += `🔁 Cầu 2-1 Xỉu tại phiên ${i + 1}<br>`;
-        if (slice === "Tài-Tài-Tài") patterns += `💪 Cầu bền Tài tại phiên ${i + 1}<br>`;
-        if (slice === "Xỉu-Xỉu-Xỉu") patterns += `💪 Cầu bền Xỉu tại phiên ${i + 1}<br>`;
-        
-        // Phát hiện kéo 1-1
-        if (slice === "Tài-Xỉu-Tài" || slice === "Xỉu-Tài-Xỉu") {
-          keo11Type = slice === "Tài-Xỉu-Tài" ? "Tài-Xỉu-Tài" : "Xỉu-Tài-Xỉu";
-          keo11Count++;
-          patterns += `🎯 KÉO 1-1: ${slice} tại phiên ${i + 1}<br>`;
+      const labels = labelize(nums);
+      const {patterns, keo11Count} = detectPatterns(labels);
+
+      // descriptive stats
+      const total = labels.length;
+      const taiCount = labels.filter(l=>l==='Tài').length;
+      const xiuCount = total - taiCount;
+      const taiPct = Math.round((taiCount/total)*1000)/10;
+      const xiuPct = Math.round((xiuCount/total)*1000)/10;
+
+      const {counts, probs} = computeTransitionMatrix(labels);
+
+      // simple rule-based "prediction" (keeps original heuristic but framed carefully)
+      const last3 = labels.slice(-3).join('-');
+      let prediction = 'Xỉu';
+      let confidence = 50;
+      let isKeo11 = false;
+
+      if (last3 === 'Tài-Xỉu-Tài') { prediction = 'Xỉu'; confidence = 60; isKeo11 = true; }
+      else if (last3 === 'Xỉu-Tài-Xỉu') { prediction = 'Tài'; confidence = 60; isKeo11 = true; }
+      else if (last3 === 'Tài-Tài-Tài') { prediction = 'Xỉu'; confidence = 58; }
+      else if (last3 === 'Xỉu-Xỉu-Xỉu') { prediction = 'Tài'; confidence = 58; }
+      else {
+        // fallback to 1-step transition: look at last label
+        const last = labels[labels.length-1];
+        const p = probs[last];
+        if (p && (p['Tài'] || p['Xỉu'])) {
+          prediction = p['Tài'] > p['Xỉu'] ? 'Tài' : 'Xỉu';
+          confidence = Math.round(Math.max(p['Tài'], p['Xỉu']));
+          confidence = Math.min(90, 45 + confidence/2);
         }
       }
 
-      let last3 = labels.slice(-3).join("-");
-      let prediction = "Xỉu";
-      let confidence = 60;
-      let isKeo11 = false;
+      // speak the prediction if enabled
+      speak(`Dự đoán: ${prediction}`);
 
-      // Kiểm tra nếu đang kéo 1-1
-      if (last3 === "Tài-Xỉu-Tài") {
-        prediction = "Xỉu"; confidence = 82;
-        isKeo11 = true;
-      } else if (last3 === "Xỉu-Tài-Xỉu") {
-        prediction = "Tài"; confidence = 82;
-        isKeo11 = true;
-      } else if (last3 === "Tài-Tài-Tài") {
-        prediction = "Xỉu"; confidence = 88;
-      } else if (last3 === "Xỉu-Xỉu-Xỉu") {
-        prediction = "Tài"; confidence = 85;
-      } else if (last3 === "Tài-Tài-Xỉu") {
-        prediction = "Tài"; confidence = 75;
-      } else if (last3 === "Xỉu-Xỉu-Tài") {
-        prediction = "Xỉu"; confidence = 70;
+      // build result HTML
+      let resultHTML = `<strong>🤖 Dự đoán (chỉ mang tính minh họa):</strong> <span class="highlight">${prediction}</span><br>`;
+      resultHTML += `🎯 "Độ tin cậy" ước lượng: <strong>${confidence}%</strong> (không phải bảo đảm)<br>`;
+      if (isKeo11) resultHTML += `<br><span class="highlight-keo">💗 Phát hiện mẫu KÉO 1-1 (chuỗi 3)</span><br>`;
+
+      resultHTML += `<hr><strong>📊 Thống kê mô tả:</strong><br>`;
+      resultHTML += `<table class="stats"><tr><th>Tổng</th><td>${total}</td><th>Tài</th><td>${taiCount} (${taiPct}%)</td><th>Xỉu</th><td>${xiuCount} (${xiuPct}%)</td></tr></table>`;
+
+      resultHTML += `<strong>🔁 Ma trận chuyển tiếp 1-bước (P(next|current) %):</strong><br>`;
+      resultHTML += `<table class="stats"><tr><th></th><th>->Tài</th><th>->Xỉu</th></tr>`;
+      resultHTML += `<tr><th>From Tài</th><td>${probs['Tài']['Tài'] || 0}%</td><td>${probs['Tài']['Xỉu'] || 0}%</td></tr>`;
+      resultHTML += `<tr><th>From Xỉu</th><td>${probs['Xỉu']['Tài'] || 0}%</td><td>${probs['Xỉu']['Xỉu'] || 0}%</td></tr>`;
+      resultHTML += `</table>`;
+
+      if (patterns) resultHTML += `<hr><strong>🔎 Phân tích mẫu (chuỗi 3):</strong><br>${patterns}`;
+
+      document.getElementById('result').innerHTML = resultHTML;
+      document.getElementById('patternOutput').innerHTML = '';
+
+      const time = new Date().toISOString();
+      const keoNote = isKeo11 ? ' [KÉO 1-1]' : '';
+      window.logData = window.logData || [];
+      window.logData.unshift(`[${time}] Dự đoán: ${prediction} (${confidence}%)${keoNote} — N=${total}`);
+      // keep recent 200 entries
+      if (window.logData.length > 200) window.logData.length = 200;
+      localStorage.setItem(STORAGE_LOG_KEY, JSON.stringify(window.logData));
+      renderLog();
+    }
+
+    function renderLog() {
+      const container = document.getElementById('historyLog');
+      if (!window.logData || window.logData.length === 0) {
+        container.innerHTML = '<strong>📅 Lịch sử phân tích:</strong><br><em>Chưa có dữ liệu</em>';
+        return;
       }
+      container.innerHTML = '<strong>📅 Lịch sử phân tích:</strong><br>' + window.logData.join('<br>');
+    }
 
-      speak(prediction);
+    function clearHistory() {
+      if (!confirm('Xác nhận xóa lịch sử phân tích đã lưu?')) return;
+      window.logData = [];
+      localStorage.removeItem(STORAGE_LOG_KEY);
+      localStorage.removeItem(STORAGE_INPUT_KEY);
+      document.getElementById('historyInput').value = '';
+      renderLog();
+    }
 
-      let resultHTML = `
-        🤖 Dự đoán phiên tiếp theo: <span class="highlight">${prediction}</span><br>
-        🎯 Độ tin cậy: <strong>${confidence}%</strong>
-      `;
-      
-      if (isKeo11) {
-        resultHTML += `<br><span class="highlight-keo">💗 ĐANG KÉO 1-1! Chọn ${prediction}</span>`;
-      }
-
-      document.getElementById("result").innerHTML = resultHTML;
-      document.getElementById("patternOutput").innerHTML = `<hr><strong>📊 Phân tích cầu:</strong><br>${patterns}`;
-
-      const time = new Date().toLocaleTimeString();
-      const keoNote = isKeo11 ? " [KÉO 1-1]" : "";
-      logData.unshift(`[${time}] Dự đoán: ${prediction} (${confidence}%)${keoNote}`);
-      document.getElementById("historyLog").innerHTML = "<strong>📅 Lịch sử dự đoán hôm nay:</strong><br>" + logData.join("<br>");
+    function exportCSV() {
+      const raw = document.getElementById('historyInput').value.trim();
+      const nums = parseInput(raw);
+      if (nums.length === 0) { alert('Không có dữ liệu để xuất.'); return; }
+      const labels = labelize(nums);
+      let csv = 'index,value,label\n';
+      for (let i=0;i<nums.length;i++) csv += `${i+1},${nums[i]},${labels[i]}\n`;
+      const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'tai_xiu_analysis.csv';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
     }
   </script>
 </body>
